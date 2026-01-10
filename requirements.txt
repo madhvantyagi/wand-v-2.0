@@ -1,0 +1,26 @@
+# Project Dependencies
+# This file includes dependencies for both modules:
+# 1. job/ - Company Intelligence Scraper
+# 2. profile/ - Profile Extractor
+
+# ============================================================================
+# Job Intelligence Scraper (job/)
+# ============================================================================
+python-jobspy>=1.1.0
+pandas>=2.0.0
+beautifulsoup4>=4.12.0
+requests>=2.31.0
+
+# Future phases (currently stubs)
+# playwright>=1.40.0  # Phase 2: Company website scraping
+# feedparser>=6.0.0   # Phase 3: News feeds
+
+# ============================================================================
+# Profile Extractor (profile/)
+# ============================================================================
+pymupdf>=1.23.0        # PDF extraction
+trafilatura>=1.6.0     # HTML extraction
+instructor>=1.0.0      # LLM JSON validation
+openai>=1.0.0          # DeepSeek API (OpenAI-compatible)
+pydantic>=2.0.0        # Data validation
+python-dotenv>=1.0.0   # Environment variables
