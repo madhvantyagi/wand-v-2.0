@@ -1,213 +1,233 @@
-# Job Intelligence Scraper
+# Job Intelligence Extractor
 
 Extract comprehensive company intelligence from job postings, websites, and news.
 
 ## Overview
 
-3-phase system that gathers company data from multiple sources:
-- **Phase 1**: Job postings (tech stack, salaries, benefits)
-- **Phase 2**: Company website (mission, values, products)
-- **Phase 3**: Recent news (headlines, announcements)
+Multi-source intelligence system with a single entry point:
+
+```python
+from job import extract_company_intelligence
+
+result = extract_company_intelligence("Google")
+```
 
 ---
 
-## Phase 1: Job Postings Intelligence
+## Directory Structure
 
-### Functionality
-Scrapes job postings from LinkedIn, Indeed, and Glassdoor to extract company intelligence.
-
-### Input
-```python
-from job.phases import get_salary_and_stack
-
-result = get_salary_and_stack("Google")
+```
+job/
+├── extractor.py          # Main entry point
+├── sources/
+│   ├── jobs.py          # Job postings intelligence
+│   ├── website.py       # Company website intelligence
+│   ├── news.py          # News scraping
+│   └── posting.py       # Single job posting parser
+├── tests/
+│   ├── test_extractor.py
+│   ├── test_jobs.py
+│   ├── test_website.py
+│   ├── test_news.py
+│   └── test_posting.py
+└── README.md
 ```
 
-**Parameters**:
-- `company_name` (string): Company to research
+---
 
-### Output
+## Main Entry Point: `extractor.py`
+
+### `extract_company_intelligence()`
+
+Extract intelligence from all sources for a company.
+
+**Input:**
+```python
+from job import extract_company_intelligence
+
+result = extract_company_intelligence(
+    company_name="Google",      # Required
+    max_jobs=50,                # Max job postings to analyze
+    include_website=True,       # Scrape company website
+    include_news=True,          # Scrape news
+    website_url=None            # Optional: provide website URL
+)
+```
+
+**Output:**
 ```json
 {
-  "phase_1_results": {
-    "company": "Google",
-    "active_role_count": 50,
-    "primary_source": "LinkedIn/Indeed",
-    "derived_intelligence": {
-      "tech_stack": ["Python", "Java", "Kubernetes", "AWS"],
-      "salary_range": {
-        "min": 150000,
-        "max": 200000,
-        "currency": "USD",
-        "source": "Job Board Data"
-      },
-      "culture_signals": {
-        "benefits": ["Health Insurance", "401k", "Remote Culture"],
-        "hiring_tempo": "Active (Posted 5 days ago)"
-      },
-      "recruiter_contacts": ["careers@google.com"]
-    },
-    "raw_listings": [...]
+  "company": "Google",
+  "jobs": {
+    "tech_stack": ["Python", "Java", "Kubernetes"],
+    "salary_range": {"min": 150000, "max": 200000},
+    "benefits": ["Health Insurance", "401k"],
+    "hiring_tempo": "Active",
+    "recruiter_contacts": ["careers@google.com"],
+    "active_roles": 50
+  },
+  "website": {
+    "mission": "Organize the world's information...",
+    "values_explicit": ["Innovation"],
+    "values_implicit": ["Speed", "User Focus"],
+    "products": ["Search", "Cloud", "Android"],
+    "culture": ["Remote-friendly"],
+    "tech_stack": ["Go", "Python"],
+    "company_info": {"size": "1000+", "industry": "Tech"}
+  },
+  "news": {
+    "headlines": ["Google launches new AI..."],
+    "count": 20
+  },
+  "metadata": {
+    "sources_used": ["jobs", "website", "news"],
+    "api_calls": 2,
+    "errors": []
   }
 }
 ```
 
-### Methodology
-1. **Job Fetching**: Uses `jobspy` to scrape 50 job postings (30-day filter)
-2. **Tech Role Filtering**: Filters for tech roles (engineer, developer, architect, etc.)
-3. **Batch AI Extraction**: Sends all jobs to DeepSeek in ONE API call
-4. **Aggregation**: Combines results, ranks by frequency
-
-### Costing
-- **AI API Calls**: 1 DeepSeek call (batch processing all jobs)
-- **Other API Calls**: ~3-5 HTTP requests to job boards (via jobspy)
-- **Estimated Cost**: ~$0.01 per company (DeepSeek pricing)
-
-### Libraries Used
-- `python-jobspy` - Job board scraping
-- `pandas` - Data processing
-- `instructor` - LLM structured outputs
-- `openai` - DeepSeek API client
-- `pydantic` - Data validation
-- `models.get_deepseek_client()` - Centralized LLM client
+**Error Handling:** Each source runs independently. If one fails, others continue. Errors are logged in `metadata.errors`.
 
 ---
 
-## Phase 2: Company Website Intelligence
+### `extract_from_posting()`
 
-### Functionality
-Extracts mission, values, products, and tech stack from company websites.
+Parse a single job posting text.
 
-### Input
+**Input:**
 ```python
-from job.phases import get_company_info
+from job import extract_from_posting
 
-result = get_company_info("Stripe")
-# Or with explicit website:
-result = get_company_info("Stripe", website="https://stripe.com")
+posting = """
+Senior Software Engineer at Stripe
+Requirements: 5+ years Python...
+"""
+
+result = extract_from_posting(posting)
 ```
 
-**Parameters**:
-- `company_name` (string): Company to research
-- `website` (string, optional): Company website URL (auto-discovered if not provided)
-
-### Output
+**Output:**
 ```json
 {
-  "mission": "Build financial infrastructure for the internet",
-  "values_explicit": ["User-first", "Move fast"],
-  "values_implicit": ["Innovation", "Technical Excellence", "Customer Focus"],
-  "products": ["Payments", "Billing", "Connect", "Radar"],
-  "culture": ["Remote-first", "Learning culture"],
-  "tech_stack": ["Ruby", "Go", "React", "PostgreSQL"],
-  "company_size": "1000+",
-  "industry": "FinTech",
-  "founded": "2010",
-  "website": "https://stripe.com"
+  "company_name": "Stripe",
+  "job_title": "Senior Software Engineer",
+  "about_company": "Stripe is a technology company...",
+  "job_description": "Build scalable payment systems...",
+  "location": "San Francisco, CA",
+  "remote_policy": "Hybrid",
+  "required_qualifications": ["5+ years experience", "BS/MS CS"],
+  "preferred_qualifications": ["Fintech experience"],
+  "technical_skills": ["Python", "Ruby", "Go", "AWS"],
+  "soft_skills_explicit": ["Strong communication"],
+  "soft_skills_implicit": ["Leadership", "Collaboration"],
+  "salary_range": {"min": 180000, "max": 250000},
+  "benefits": ["Health insurance", "401k", "Equity"],
+  "experience_level": "Senior"
 }
 ```
-
-### Methodology
-1. **Website Discovery**: Auto-discovers company website via heuristics + Google search
-2. **Page Scraping**: Scrapes 5 key pages (homepage, about, careers, engineering, etc.)
-3. **AI Extraction**: Sends all content to DeepSeek for structured extraction
-4. **Implicit Values**: AI infers values from culture/messaging (not just explicit statements)
-
-### Costing
-- **AI API Calls**: 1 DeepSeek call
-- **Other API Calls**: ~6-8 HTTP requests (website discovery + page scraping)
-- **Estimated Cost**: ~$0.01 per company
-
-### Libraries Used
-- `requests` - HTTP requests
-- `beautifulsoup4` - HTML parsing
-- `instructor` - LLM structured outputs
-- `openai` - DeepSeek API client
-- `pydantic` - Data validation
-- `models.get_deepseek_client()` - Centralized LLM client
 
 ---
 
-## Phase 3: News & Social Signals
+## Individual Sources
 
-### Functionality
-Scrapes recent company news from Google News.
+### Source 1: Jobs (`sources/jobs.py`)
 
-### Input
-```python
-from job.phases import get_news_signals
+**Functionality:** Scrapes job postings from LinkedIn, Indeed, Glassdoor
 
-result = get_news_signals("Stripe")
-```
+**Methodology:**
+1. Fetches up to 50 job postings via `jobspy`
+2. Filters for tech roles
+3. Batch processes ALL jobs in ONE AI call
+4. Aggregates tech stack, salaries, benefits
 
-**Parameters**:
-- `company_name` (string): Company to research
+**Costing:**
+- AI Calls: 1 DeepSeek call
+- HTTP Calls: ~5 (job board requests)
+- Cost: ~$0.01
 
-### Output
-```json
-{
-  "news": [
-    "Stripe launches new payment platform in Asia",
-    "Stripe raises $600M in Series H funding",
-    "Stripe partners with Amazon for checkout integration"
-  ],
-  "count": 20
-}
-```
+**Libraries:** `python-jobspy`, `pandas`, `instructor`, `pydantic`
 
-### Methodology
-1. **Google News Search**: Searches Google News for company
-2. **Headline Extraction**: Extracts up to 20 recent headlines
-3. **No AI Processing**: Returns raw headlines (no categorization)
+---
 
-### Costing
-- **AI API Calls**: 0 (no AI used)
-- **Other API Calls**: 1 HTTP request to Google News
-- **Estimated Cost**: Free
+### Source 2: Website (`sources/website.py`)
 
-### Libraries Used
-- `requests` - HTTP requests
-- `beautifulsoup4` - HTML parsing
+**Functionality:** Extracts company info from official website
+
+**Methodology:**
+1. Auto-discovers website (or uses provided URL)
+2. Scrapes 5 key pages (about, careers, engineering, etc.)
+3. AI extracts mission, values (explicit + implicit), products, tech stack
+
+**Costing:**
+- AI Calls: 1 DeepSeek call
+- HTTP Calls: ~8 (website discovery + scraping)
+- Cost: ~$0.01
+
+**Libraries:** `requests`, `beautifulsoup4`, `instructor`, `pydantic`
+
+---
+
+### Source 3: News (`sources/news.py`)
+
+**Functionality:** Scrapes recent company news
+
+**Methodology:**
+1. Searches Google News
+2. Extracts headlines (no AI)
+
+**Costing:**
+- AI Calls: 0
+- HTTP Calls: 1
+- Cost: Free
+
+**Libraries:** `requests`, `beautifulsoup4`
+
+---
+
+### Source 4: Posting (`sources/posting.py`)
+
+**Functionality:** Parses single job posting text
+
+**Methodology:**
+1. Takes raw job posting text as input
+2. AI extracts all structured information
+3. Infers implicit soft skills from description
+
+**Costing:**
+- AI Calls: 1 DeepSeek call
+- HTTP Calls: 0
+- Cost: ~$0.005
+
+**Libraries:** `instructor`, `pydantic`
 
 ---
 
 ## Total Cost Per Company
 
-**AI API Calls**: 2 DeepSeek calls (Phase 1 + Phase 2)  
-**HTTP Requests**: ~10-15 total  
-**Estimated Cost**: ~$0.02 per company
+| Source | AI Calls | HTTP Calls | Cost |
+|--------|----------|------------|------|
+| Jobs | 1 | ~5 | ~$0.01 |
+| Website | 1 | ~8 | ~$0.01 |
+| News | 0 | 1 | Free |
+| **Total** | **2** | **~14** | **~$0.02** |
 
 ---
-
-## Installation
-
-```bash
-pip install -r requirements.txt
-```
-
-## Usage
-
-```python
-from job.phases import get_salary_and_stack, get_company_info, get_news_signals
-
-# Phase 1: Job intelligence
-jobs = get_salary_and_stack("Google")
-
-# Phase 2: Website intelligence
-company = get_company_info("Google")
-
-# Phase 3: News
-news = get_news_signals("Google")
-```
 
 ## Testing
 
 ```bash
-# Test individual phases
-python -m job.tests.test_phase1
-python -m job.tests.test_phase2
-python -m job.tests.test_phase3
+# Test main extractor
+python -m job.tests.test_extractor
+
+# Test individual sources
+python -m job.tests.test_jobs
+python -m job.tests.test_website
+python -m job.tests.test_news
+python -m job.tests.test_posting
 ```
+
+---
 
 ## Configuration
 
@@ -215,3 +235,15 @@ Set DeepSeek API key in `.env`:
 ```
 DEEPSEEK_API_KEY=your_key_here
 ```
+
+---
+
+## Standardized Variable Names
+
+All outputs use consistent naming:
+- `tech_stack` - Technologies
+- `salary_range` - Compensation info
+- `benefits` - Perks and benefits
+- `values_explicit` - Stated values
+- `values_implicit` - Inferred values
+- `company_info` - Size, industry, founded

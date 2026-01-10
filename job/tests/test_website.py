@@ -3,7 +3,7 @@ Test Phase 2: Company Website Intelligence
 """
 
 import json
-from job.phases.phase2_company import get_company_info
+from job.sources.website import get_company_info
 
 
 def test_phase2(company_name: str, website: str = None):

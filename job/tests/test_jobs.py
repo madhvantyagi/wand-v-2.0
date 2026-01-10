@@ -5,7 +5,7 @@ Run this to test salary and tech stack extraction.
 """
 
 import json
-from ..phases.phase1_jobs import get_salary_and_stack
+from job.sources.jobs import get_salary_and_stack
 
 
 def test_phase1(company_name: str):
