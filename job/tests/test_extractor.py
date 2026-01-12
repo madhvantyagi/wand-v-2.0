@@ -178,7 +178,7 @@ def test_posting_extraction():
 
 if __name__ == "__main__":
     # Test company extraction
-    test_company_extraction("Stripe")
+    test_company_extraction("Hudson River Trading")
     
     # Test posting extraction
     # test_posting_extraction()

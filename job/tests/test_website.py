@@ -95,7 +95,7 @@ def test_phase2(company_name: str, website: str = None):
 
 if __name__ == "__main__":
     # Test with a company
-    company = "Stripe"
+    company = "Hudson River Trading"
     
     # Optional: provide website directly
     # website = "https://shipday.com"

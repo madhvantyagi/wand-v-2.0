@@ -14,42 +14,24 @@ def test_posting_parser():
     
     # Sample job posting
     sample_posting = """
-    Senior Software Engineer at Stripe
-    
-    About Stripe:
-    Stripe is a technology company that builds economic infrastructure for the internet.
-    Millions of companies use our software to accept payments and manage their businesses online.
-    
-    About the Role:
-    We're looking for a Senior Software Engineer to join our Payments team. You'll be building
-    scalable systems that process billions of dollars in transactions.
-    
-    Location: San Francisco, CA (Hybrid - 3 days in office)
-    
-    What you'll do:
-    - Design and build high-performance payment processing systems
-    - Lead technical projects from conception to deployment
-    - Mentor junior engineers and contribute to team culture
-    - Collaborate with product and design teams
-    
-    Requirements:
-    - 5+ years of software engineering experience
-    - Strong proficiency in one or more: Ruby, Go, Java, Python
-    - Experience with distributed systems at scale
-    - BS/MS in Computer Science or equivalent
-    
-    Nice to have:
-    - Experience with payment systems or fintech
-    - Contributions to open source projects
-    - Experience with Kubernetes and AWS
-    
-    Benefits:
-    - Competitive salary ($180k - $250k)
-    - Equity compensation
-    - Health, dental, and vision insurance
-    - 401(k) with matching
-    - Unlimited PTO
-    - Learning and development budget
+    As a Software Engineer at Hudson River Trading (HRT), the code you write is our business. Our engineers create and maintain critical technology and infrastructure that is integral to the success of our trading. In this role, you will work closely with other engineers across the firm who design trading algorithms and monitor trading in an extremely fast-paced, real-time environment! We are looking for smart programmers who love to code, enjoy being challenged, and can thrive in an open and collaborative company culture.
+
+Profile
+
+In your spare time you: code, tinker, read, explore, break things, and have an insatiable curiosity for all things computer-related — you'll find like-minded people here
+You are capable of working both independently, as well as part of a team and can analyze and fix problems quickly
+You can look at code, figure out how it works, and identify how to make it better
+You can describe software designs at a high level (the abstract interface), low level (step-by-step algorithm), and anywhere in between
+You really like to work with people who push you to be better at what you do
+Qualifications
+
+You are a full-time undergraduate student studying computer science or a related field who is eligible for full-time roles in 2026.
+
+Excellent design, debugging, and problem solving skills
+Working experience with C/C++ or Python is required, as are good CS fundamentals
+Knowledge of UNIX operating systems (we use Linux), system/processor performance, and network communication
+Interest in low-level architecture, logic design, and/or verification is a plus
+Annual base salary of $300,000. Pay (base and bonus) may vary depending on job-related skills and experience. A sign-on and discretionary performance bonus will be provided as part of the total compensation package, in addition to company-paid medical and/or other benefits.
     """
     
     print("🔍 Parsing job posting...")
