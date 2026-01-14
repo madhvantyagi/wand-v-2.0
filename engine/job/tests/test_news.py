@@ -3,7 +3,7 @@ Test Phase 3: News & Social Signals
 """
 
 import json
-from job.sources.news import get_news_signals
+from engine.job.sources.news import get_news_signals
 
 
 def test_phase3(company_name: str):

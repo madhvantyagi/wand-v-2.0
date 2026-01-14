@@ -11,7 +11,8 @@ const getToken = () => localStorage.getItem('wand_token');
 // Common headers with auth
 const getHeaders = () => {
     const headers = {
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
     };
 
     const token = getToken();
@@ -364,11 +365,145 @@ export const discrepancyApi = {
     }
 };
 
+// ============================================================================
+// APPLICATION APIs
+// ============================================================================
+
+export const applicationApi = {
+    // Get application status for a job
+    getStatus: async (jobId) => {
+        const response = await fetch(`${API_BASE}/application/jobs/${jobId}/application`, {
+            headers: getHeaders()
+        });
+
+        if (response.status === 404) return null;
+        if (!response.ok) throw new Error('Failed to get application status');
+        return response.json();
+    },
+
+    // Create or update application status
+    updateStatus: async (jobId, status, notes = null) => {
+        const body = { status, notes };
+        console.log('Sending to API:', body);
+
+        const response = await fetch(`${API_BASE}/application/jobs/${jobId}/application`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+            console.error('API Error:', error);
+            throw new Error(error.detail || 'Failed to update application status');
+        }
+        return response.json();
+    }
+};
+
+// ============================================================================
+// UNIFIED ANALYZE API
+// ============================================================================
+
+export const analyzeApi = {
+    /**
+     * Unified job analysis - single endpoint for complete pipeline
+     * @param {string} jobText - Raw job posting text
+     * @param {string[]} profileIds - IDs of profiles to use for matching
+     * @param {string|null} companyName - Optional company name for intel
+     */
+    analyze: async (jobText, profileIds, companyName = null) => {
+        const response = await fetch(`${API_BASE}/analyze/`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({
+                job_text: jobText,
+                profile_ids: profileIds,
+                company_name: companyName
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+            throw new Error(error.detail || 'Analysis failed');
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Get list of all analysis tasks (active and recent)
+     */
+    getTasks: async () => {
+        const response = await fetch(`${API_BASE}/analyze/tasks`, {
+            headers: getHeaders()
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch tasks');
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Delete an analysis task
+     */
+    deleteTask: async (taskId) => {
+        const response = await fetch(`${API_BASE}/analyze/tasks/${taskId}`, {
+            method: 'DELETE',
+            headers: getHeaders()
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to delete task');
+        }
+        // Assuming a successful delete might return a 204 No Content or a simple JSON success message
+        // For consistency, we'll try to return JSON if available, otherwise just acknowledge success.
+        if (response.status !== 204) {
+            return response.json();
+        }
+        return {}; // Return an empty object for 204 No Content
+    },
+
+    /**
+     * Delete all analysis tasks
+     */
+    clearTasks: async () => {
+        const response = await fetch(`${API_BASE}/analyze/tasks`, {
+            method: 'DELETE',
+            headers: getHeaders()
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to clear tasks');
+        }
+        return response.json();
+    },
+
+    /**
+     * Get status of a specific task
+     */
+    getStatus: async (taskId) => {
+        const response = await fetch(`${API_BASE}/analyze/${taskId}`, {
+            headers: getHeaders()
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch task status');
+        }
+
+        return response.json();
+    }
+};
+
 // Export all
 export default {
     auth: authApi,
     profile: profileApi,
     job: jobApi,
     match: matchApi,
-    discrepancy: discrepancyApi
+    discrepancy: discrepancyApi,
+    application: applicationApi,
+    analyze: analyzeApi
 };

@@ -12,7 +12,7 @@ from datetime import datetime
 from jobspy import scrape_jobs
 import pandas as pd
 from pydantic import BaseModel, Field
-from models import get_deepseek_client
+from engine.models import get_deepseek_client
 
 
 # ============================================================================

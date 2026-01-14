@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { FileText, Search, Copy, CheckCircle, Loader2, Sparkles, Palette, MessageSquare, Trash2, AlertTriangle } from 'lucide-react'
+import { FileText, Search, Copy, CheckCircle, Loader2, Sparkles, Palette, MessageSquare, Trash2, AlertTriangle, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { matchApi, profileApi, jobApi } from '../api/client'
 
@@ -21,6 +21,7 @@ export default function CoverLetters() {
     const [copiedId, setCopiedId] = useState(null)
     const [deleteLetter, setDeleteLetter] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [expandedCards, setExpandedCards] = useState(new Set())
 
     // New letter form
     const [showForm, setShowForm] = useState(!!jobIdFromUrl)
@@ -109,9 +110,22 @@ export default function CoverLetters() {
         setDeleteLetter(null)
     }
 
+    const toggleExpand = (letterId) => {
+        setExpandedCards(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(letterId)) {
+                newSet.delete(letterId)
+            } else {
+                newSet.add(letterId)
+            }
+            return newSet
+        })
+    }
+
     const filteredLetters = letters.filter(letter =>
         letter.style?.toLowerCase().includes(searchTerm.toLowerCase())
     )
+
 
     if (loading) {
         return (
@@ -298,50 +312,96 @@ export default function CoverLetters() {
                             </p>
                         </div>
                     ) : (
-                        <div className="grid gap-4">
-                            {filteredLetters.map((letter, index) => (
-                                <motion.div
-                                    key={letter.id}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: index * 0.05 }}
-                                    className="glass-card"
-                                >
-                                    <div className="flex items-start justify-between mb-3">
-                                        <div>
-                                            <span className="px-2 py-0.5 text-xs rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 capitalize">
-                                                {letter.style}
-                                            </span>
-                                            <p className="text-xs text-[var(--text-tertiary)] mt-2">
-                                                {new Date(letter.created_at).toLocaleDateString()}
-                                            </p>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => handleCopy(letter.id, letter.letter)}
-                                                className="p-2 rounded-lg hover:bg-[var(--glass-hover)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+                        <div className="grid gap-3">
+                            {filteredLetters.map((letter, index) => {
+                                const isExpanded = expandedCards.has(letter.id)
+                                const paragraphs = letter.letter.split('\n\n')
+                                // Show first 2-3 paragraphs as preview
+                                const previewText = paragraphs.slice(0, 3).join(' ')
+
+                                return (
+                                    <motion.div
+                                        key={letter.id}
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: index * 0.05 }}
+                                        className={`glass-card ${isExpanded ? 'p-5' : 'p-4'}`}
+                                        style={{ padding: isExpanded ? undefined : '12px 16px' }}
+                                    >
+                                        {/* Header - Always visible */}
+                                        <div className="flex items-start justify-between">
+                                            <div
+                                                className="flex-1 cursor-pointer"
+                                                onClick={() => toggleExpand(letter.id)}
                                             >
-                                                {copiedId === letter.id ? (
-                                                    <CheckCircle className="w-4 h-4 text-emerald-400" />
-                                                ) : (
-                                                    <Copy className="w-4 h-4" />
-                                                )}
-                                            </button>
-                                            <button
-                                                onClick={() => setDeleteLetter(letter)}
-                                                className="p-2 rounded-lg hover:bg-red-500/10 text-[var(--text-tertiary)] hover:text-red-400 transition-colors"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="px-2 py-0.5 text-xs rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 capitalize">
+                                                        {letter.style}
+                                                    </span>
+                                                    <p className="text-xs text-[var(--text-tertiary)]">
+                                                        {new Date(letter.created_at).toLocaleDateString()}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={() => handleCopy(letter.id, letter.letter)}
+                                                    className="p-2 rounded-lg hover:bg-[var(--glass-hover)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+                                                    title="Copy to clipboard"
+                                                >
+                                                    {copiedId === letter.id ? (
+                                                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                                                    ) : (
+                                                        <Copy className="w-4 h-4" />
+                                                    )}
+                                                </button>
+                                                <button
+                                                    onClick={() => setDeleteLetter(letter)}
+                                                    className="p-2 rounded-lg hover:bg-red-500/10 text-[var(--text-tertiary)] hover:text-red-400 transition-colors"
+                                                    title="Delete"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => toggleExpand(letter.id)}
+                                                    className="p-2 rounded-lg hover:bg-[var(--glass-hover)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+                                                    title={isExpanded ? "Collapse" : "Expand"}
+                                                >
+                                                    <ChevronDown
+                                                        className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                                                    />
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="text-sm text-[var(--text-secondary)] space-y-3">
-                                        {letter.letter.split('\n\n').map((para, i) => (
-                                            <p key={i} className="leading-relaxed">{para}</p>
-                                        ))}
-                                    </div>
-                                </motion.div>
-                            ))}
+
+                                        {/* Content - Collapsible */}
+                                        {isExpanded ? (
+                                            <motion.div
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: 'auto', opacity: 1 }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                                transition={{ duration: 0.2, ease: 'easeInOut' }}
+                                                className="mt-3"
+                                            >
+                                                <div className="text-sm text-[var(--text-secondary)] space-y-3">
+                                                    {paragraphs.map((para, i) => (
+                                                        <p key={i} className="leading-relaxed">{para}</p>
+                                                    ))}
+                                                </div>
+                                            </motion.div>
+                                        ) : (
+                                            <div
+                                                className="mt-2 cursor-pointer"
+                                                onClick={() => toggleExpand(letter.id)}
+                                            >
+                                                <p className="text-sm text-[var(--text-secondary)] leading-relaxed line-clamp-2">
+                                                    {previewText}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                )
+                            })}
                         </div>
                     )}
                 </>

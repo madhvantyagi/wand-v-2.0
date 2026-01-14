@@ -2,8 +2,6 @@
 Profile routes - CRUD for Resume (PDF), LinkedIn (PDF), and Portfolio (HTML)
 """
 
-import os
-import tempfile
 import asyncio
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,7 +11,7 @@ from typing import List
 from ..db import get_db, User, Profile
 from ..schemas import ProfileResponse
 from ..deps import get_current_user
-from profile_extractor.extractor import parse_profile
+from engine.profile_extractor.extractor import parse_profile
 import json
 
 router = APIRouter()
@@ -220,7 +218,7 @@ async def _parse_and_save(
     user: User,
     db: AsyncSession
 ) -> Profile:
-    """Parse file and save to database (replaces existing if present)."""
+    """Parse file bytes and save to database (replaces existing if present)."""
     
     # Delete existing profile of this type
     result = await db.execute(
@@ -233,20 +231,13 @@ async def _parse_and_save(
     # Read file content
     content = await file.read()
     
-    # Save file temporarily and parse - run in thread pool
+    # Parse directly from bytes - run in thread pool
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_type}') as tmp:
-            tmp.write(content)
-            tmp_path = tmp.name
-        
-        parsed_result = await asyncio.to_thread(parse_profile, tmp_path, file_type)
+        parsed_result = await asyncio.to_thread(parse_profile, content, file_type)
         parsed_data = json.loads(parsed_result)
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse file: {str(e)}")
-    finally:
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
     
     # Save new profile with file content
     profile = Profile(

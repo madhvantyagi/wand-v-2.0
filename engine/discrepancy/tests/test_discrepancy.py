@@ -5,7 +5,7 @@ Uses actual parsed profile JSON files from profile_extractor/tests/
 
 import json
 import os
-from discrepancy import compare_profile_sources, format_for_table
+from engine.discrepancy import compare_profile_sources, format_for_table
 
 
 def load_test_profiles():

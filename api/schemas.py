@@ -76,6 +76,23 @@ class JobResponse(BaseModel):
         from_attributes = True
 
 
+class JobListResponse(BaseModel):
+    """Enhanced job response for list view with application and match data."""
+    id: str
+    user_id: str
+    job_title: Optional[str]
+    company_name: Optional[str]
+    parsed_data: Dict[str, Any]
+    created_at: datetime
+    # Additional fields for list view
+    application_status: Optional[str] = None
+    application_notes: Optional[str] = None
+    match_score: Optional[int] = None
+    
+    class Config:
+        from_attributes = True
+
+
 # ============================================================================
 # MATCH SCHEMAS
 # ============================================================================
@@ -177,7 +194,7 @@ class ApplicationCreate(BaseModel):
 
 
 class ApplicationUpdate(BaseModel):
-    status: Optional[str] = None
+    status: str  # Required
     notes: Optional[str] = None
     applied_at: Optional[datetime] = None
 
@@ -194,3 +211,38 @@ class ApplicationResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+# ============================================================================
+# UNIFIED ANALYZE SCHEMAS
+# ============================================================================
+
+class AnalyzeRequest(BaseModel):
+    """Request for unified job analysis endpoint."""
+    job_text: str = Field(..., description="Raw job posting text")
+    company_name: Optional[str] = Field(None, description="Company name for intel gathering")
+    profile_ids: List[str] = Field(..., description="IDs of profiles to use for matching")
+
+
+class AnalyzeResponse(BaseModel):
+    """Synchronous response with complete analysis results."""
+    job: Dict[str, Any] = Field(..., description="Parsed job data")
+    analysis: Dict[str, Any] = Field(..., description="Gap analysis results")
+    optimization: Optional[Dict[str, Any]] = Field(None, description="Resume optimization (if resume provided)")
+
+
+class AnalyzeTaskResponse(BaseModel):
+    """Async response with task ID for tracking."""
+    task_id: str
+    status: str = "pending"
+
+
+class AnalyzeStatusResponse(BaseModel):
+    """Status check response for async analysis."""
+    task_id: str
+    status: str  # pending, parsing, intel, analyzing, optimizing, complete, failed
+    job_title: Optional[str] = None
+    progress_message: Optional[str] = None
+    progress: int = 0  # 0-100
+    result: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None

@@ -3,7 +3,7 @@ Test Extractor - Main entry point for company intelligence
 """
 
 import json
-from job.extractor import extract_company_intelligence, extract_from_posting
+from engine.job.extractor import extract_company_intelligence, extract_from_posting
 
 
 def test_company_extraction(company_name: str):

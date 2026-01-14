@@ -8,11 +8,11 @@ from sqlalchemy import select
 from typing import List
 import asyncio
 
-from ..db import get_db, User, Job, Company
-from ..schemas import JobPostingRequest, CompanyIntelRequest, JobResponse
+from ..db import get_db, User, Job, Company, Application, GapAnalysis
+from ..schemas import JobPostingRequest, CompanyIntelRequest, JobResponse, JobListResponse
 from ..deps import get_current_user
-from job import extract_company_intelligence
-from job.sources.posting import parse_job_posting
+from engine.job import extract_company_intelligence
+from engine.job.sources.posting import parse_job_posting
 
 router = APIRouter()
 
@@ -122,18 +122,57 @@ async def get_job(
     return job
 
 
-@router.get("/", response_model=List[JobResponse])
+@router.get("/", response_model=List[JobListResponse])
 async def get_user_jobs(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get all jobs for the current user."""
+    """Get all jobs for the current user with application status and match score."""
+    # Get all jobs
     result = await db.execute(
         select(Job).where(Job.user_id == user.id).order_by(Job.created_at.desc())
     )
     jobs = result.scalars().all()
     
-    return jobs
+    # Get all applications for this user's jobs
+    job_ids = [job.id for job in jobs]
+    
+    # Query applications
+    app_result = await db.execute(
+        select(Application).where(
+            Application.user_id == user.id,
+            Application.job_id.in_(job_ids) if job_ids else False
+        )
+    )
+    applications = {app.job_id: app for app in app_result.scalars().all()}
+    
+    # Query gap analyses
+    gap_result = await db.execute(
+        select(GapAnalysis).where(
+            GapAnalysis.user_id == user.id,
+            GapAnalysis.job_id.in_(job_ids) if job_ids else False
+        )
+    )
+    gap_analyses = {gap.job_id: gap.match_score for gap in gap_result.scalars().all()}
+    
+    # Build response with additional data
+    job_list = []
+    for job in jobs:
+        app = applications.get(job.id)
+        job_data = JobListResponse(
+            id=job.id,
+            user_id=job.user_id,
+            job_title=job.job_title,
+            company_name=job.company_name,
+            parsed_data=job.parsed_data or {},
+            created_at=job.created_at,
+            application_status=app.status if app else None,
+            application_notes=app.notes if app else None,
+            match_score=gap_analyses.get(job.id)
+        )
+        job_list.append(job_data)
+    
+    return job_list
 
 
 @router.delete("/{job_id}")

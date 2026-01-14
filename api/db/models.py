@@ -42,6 +42,7 @@ class User(Base):
     applications = relationship("Application", back_populates="user")
     resume_optimizations = relationship("ResumeOptimization", back_populates="user")
     discrepancy_reports = relationship("DiscrepancyReport", back_populates="user")
+    analysis_tasks = relationship("AnalysisTask", back_populates="user")
 
 
 class Profile(Base):
@@ -167,3 +168,38 @@ class DiscrepancyReport(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     user = relationship("User", back_populates="discrepancy_reports")
+
+
+class AnalysisTask(Base):
+    """Background analysis task for async processing."""
+    __tablename__ = "analysis_tasks"
+    
+    id = Column(String(36), primary_key=True, default=get_uuid)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    
+    # Status tracking
+    status = Column(String(50), default="pending")  # pending, parsing, intel, analyzing, optimizing, complete, failed
+    progress_message = Column(String(255), default="Queued for analysis...")
+    progress = Column(Integer, default=0)  # 0-100
+    
+    # Input data
+    job_text = Column(Text, nullable=False)
+    job_title = Column(String(255))  # Extracted from job_text or result
+    company_name = Column(String(255))
+    profile_ids = Column(JsonColumn, nullable=False)  # List of profile IDs
+    
+    # Results (populated on completion)
+    result_job_id = Column(String(36), ForeignKey("jobs.id"))
+    result_analysis_id = Column(String(36), ForeignKey("gap_analyses.id"))
+    result_data = Column(JsonColumn)  # Full response data
+    
+    # Error tracking
+    error_message = Column(Text)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    user = relationship("User", back_populates="analysis_tasks")
+    result_job = relationship("Job", foreign_keys=[result_job_id])
+    result_analysis = relationship("GapAnalysis", foreign_keys=[result_analysis_id])

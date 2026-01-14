@@ -10,7 +10,7 @@ import fitz  # PyMuPDF
 import trafilatura
 from pydantic import BaseModel, Field
 from typing import List, Optional
-from models import get_deepseek_client
+from engine.models import get_deepseek_client
 
 # No need to load_dotenv - models module handles it
 
@@ -43,12 +43,12 @@ class ProfileData(BaseModel):
 # CONTENT EXTRACTION - PDF and HTML
 # ============================================================================
 
-def extract_content(file_path: str, file_type: str) -> str:
+def extract_content(file_content: bytes, file_type: str) -> str:
     """
-    Extract text content from PDF or HTML files.
+    Extract text content from PDF or HTML bytes.
     
     Args:
-        file_path: Path to the file
+        file_content: Raw bytes of the file
         file_type: Either 'pdf' or 'html'
         
     Returns:
@@ -56,45 +56,52 @@ def extract_content(file_path: str, file_type: str) -> str:
         
     Raises:
         ValueError: If file_type is not 'pdf' or 'html'
-        FileNotFoundError: If file doesn't exist
     """
     if file_type.lower() == 'pdf':
-        return _extract_pdf(file_path)
+        return _extract_pdf(file_content)
     elif file_type.lower() == 'html':
-        return _extract_html(file_path)
+        return _extract_html(file_content)
     else:
         raise ValueError(f"Unsupported file type: {file_type}. Use 'pdf' or 'html'.")
 
 
-def _extract_pdf(file_path: str) -> str:
+def _extract_pdf(file_content: bytes) -> str:
     """
-    Extract content from PDF preserving text structure.
+    Extract content from PDF bytes preserving text structure.
     
-    Extracts all text content from the PDF file.
+    Args:
+        file_content: Raw PDF bytes
+        
+    Returns:
+        Extracted text content
     """
     text = ""
-    doc = fitz.open(file_path)
+    doc = fitz.open(stream=file_content, filetype="pdf")
     for page in doc:
-        # Extract text from each page
         text += page.get_text("text")
     doc.close()
     return text
 
 
-def _extract_html(file_path: str) -> str:
+def _extract_html(file_content: bytes) -> str:
     """
-    Extract clean content from HTML, removing navigation and ads.
+    Extract clean content from HTML bytes, removing navigation and ads.
     
+    Args:
+        file_content: Raw HTML bytes
+        
+    Returns:
+        Extracted text content
+        
     Uses Trafilatura for intelligent content extraction.
     """
-    with open(file_path, 'r', encoding='utf-8') as f:
-        html_content = f.read()
+    html_string = file_content.decode('utf-8')
     
     # Trafilatura extracts main content, discards boilerplate
-    extracted = trafilatura.extract(html_content)
+    extracted = trafilatura.extract(html_string)
     
     if not extracted:
-        raise ValueError("Could not extract content from HTML file")
+        raise ValueError("Could not extract content from HTML")
     
     return extracted
 
@@ -103,12 +110,12 @@ def _extract_html(file_path: str) -> str:
 # LLM INTEGRATION - DeepSeek-V3
 # ============================================================================
 
-def parse_profile(file_path: str, file_type: str, api_key: str = None) -> str:
+def parse_profile(file_content: bytes, file_type: str, api_key: str = None) -> str:
     """
-    Parse a profile file (PDF/HTML) into structured JSON.
+    Parse profile bytes (PDF/HTML) into structured JSON.
     
     Args:
-        file_path: Path to the profile file
+        file_content: Raw bytes of the profile file
         file_type: Either 'pdf' or 'html'
         api_key: Optional DeepSeek API key (defaults to DEEPSEEK_API_KEY env var)
         
@@ -116,7 +123,9 @@ def parse_profile(file_path: str, file_type: str, api_key: str = None) -> str:
         JSON string with structured profile data
         
     Example:
-        >>> result = parse_profile("resume.pdf", "pdf")
+        >>> with open("resume.pdf", "rb") as f:
+        ...     file_bytes = f.read()
+        >>> result = parse_profile(file_bytes, "pdf")
         >>> print(result)
         {
           "name": "John Doe",
@@ -132,8 +141,8 @@ def parse_profile(file_path: str, file_type: str, api_key: str = None) -> str:
             "or pass api_key parameter."
         )
     
-    # Extract content from file
-    content = extract_content(file_path, file_type)
+    # Extract content from bytes
+    content = extract_content(file_content, file_type)
     
     # Get DeepSeek client from centralized models
     client = get_deepseek_client(api_key)

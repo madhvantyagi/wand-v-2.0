@@ -14,7 +14,7 @@ from ..schemas import (
     DiscrepancyHistoryItem, DiscrepancyReportResponse
 )
 from ..deps import get_current_user
-from discrepancy import compare_profile_sources, format_for_table
+from engine.discrepancy import compare_profile_sources, format_for_table
 
 router = APIRouter()
 

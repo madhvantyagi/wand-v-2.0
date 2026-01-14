@@ -5,7 +5,7 @@ Uses actual parsed profile and job JSON files
 
 import json
 import os
-from matcher import generate_cover_letter
+from engine.matcher import generate_cover_letter
 
 
 def load_test_data():

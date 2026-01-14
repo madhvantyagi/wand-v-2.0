@@ -3,7 +3,7 @@ Test Job Posting Parser
 """
 
 import json
-from job.sources.posting import parse_job_posting
+from engine.job.sources.posting import parse_job_posting
 
 
 def test_posting_parser():

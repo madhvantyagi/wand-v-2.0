@@ -6,7 +6,7 @@ Supports combining multiple profile sources (resume, linkedin, portfolio).
 
 from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
-from models import get_deepseek_client
+from engine.models import get_deepseek_client
 
 
 # ============================================================================
@@ -357,6 +357,7 @@ JOB REQUIREMENTS:
                 }
             ],
             temperature=0.0,
+            max_tokens=8192,
         )
         
         # Convert to dict
@@ -628,6 +629,7 @@ CANDIDATE PROFILE:
                 }
             ],
             temperature=0.0,
+            max_tokens=8192,
         )
         
         # Convert to dict and add news
@@ -648,9 +650,10 @@ CANDIDATE PROFILE:
 
 class SectionComparison(BaseModel):
     """Comparison of original vs optimized resume section."""
+    change_type: str = Field(description="Type of change: 'modify', 'add', or 'delete'")
     section_name: str = Field(description="Name of the resume section (e.g. 'Summary', 'Work Experience')")
-    original_content: str = Field(description="Original text from resume")
-    optimized_content: str = Field(description="Rewritten text optimized for the job")
+    original_content: str = Field(default="", description="Original text from resume (empty for additions)")
+    optimized_content: str = Field(default="", description="Rewritten/new text optimized for the job (empty for deletions)")
     explanation: str = Field(description="Explanation of why changes were made")
 
 
@@ -719,21 +722,27 @@ CURRENT RESUME CONTENT:
                         "2. CURRENT RESUME: The candidate's actual resume data.\n\n"
                         
                         "TASK:\n"
-                        "Rewrite 3-5 key sections of the resume to better align with the job requirements.\n"
-                        "Do NOT invent experiences. Only rephrase existing experience using job keywords.\n\n"
+                        "Analyze the resume and suggest improvements in THREE categories:\n"
+                        "1. MODIFY: Rewrite 3-5 existing sections to better align with job requirements\n"
+                        "2. ADD: Suggest 1-3 NEW sections/bullet points that highlight relevant skills from their background\n"
+                        "3. DELETE: Identify 1-2 sections that should be removed (outdated, irrelevant, or weak)\n\n"
+                        
+                        "Do NOT invent experiences. Only rephrase/reorganize existing content and suggest highlighting overlooked strengths.\n\n"
                         
                         "OUTPUT REQUIREMENTS:\n"
-                        "Generate a list of SectionComparison objects, each containing:\n"
-                        "- section_name: e.g. 'Professional Summary', 'Experience: Software Engineer at X'\n"
-                        "- original_content: Collection of points/text from original resume\n"
-                        "- optimized_content: The REWRITTEN version, optimized for keywords and impact\n"
-                        "- explanation: Brief reason for the changes\n\n"
+                        "Generate a list of SectionComparison objects, each with:\n"
+                        "- change_type: 'modify', 'add', or 'delete'\n"
+                        "- section_name: e.g. 'Professional Summary', 'Skills Section', 'Experience: Software Engineer at X'\n"
+                        "- original_content: Text from resume (empty string for additions)\n"
+                        "- optimized_content: The NEW/REWRITTEN version (empty string for deletions)\n"
+                        "- explanation: Brief reason for the change\n\n"
                         
                         "CRITICAL RULES:\n"
-                        "1. maintain truthfulness - do not hallucinate skills they don't have\n"
-                        "2. focus on impact and metrics\n"
-                        "3. use keywords from the job description\n"
-                        "4. ensure optimized_content is complete and ready to paste\n"
+                        "1. Maintain truthfulness - do not hallucinate skills they don't have\n"
+                        "2. For ADDITIONS: Only suggest content based on skills/experience already in the resume\n"
+                        "3. For DELETIONS: Remove redundant, outdated, or weak content\n"
+                        "4. Focus on impact, metrics, and job-relevant keywords\n"
+                        "5. Ensure all content is complete and ready to use\n"
                     )
                 },
                 {
@@ -741,7 +750,8 @@ CURRENT RESUME CONTENT:
                     "content": f"{job_summary}\n\n{resume_summary}"
                 }
             ],
-            temperature=0.0
+            temperature=0.0,
+            max_tokens=8192,
         )
         
         print("✅ Resume optimization complete!")

@@ -3,6 +3,7 @@ import { Toaster } from 'sonner'
 import { ThemeProvider } from './context/ThemeContext'
 import { AuthProvider } from './context/AuthContext'
 import { UploadProvider } from './context/UploadContext'
+import { AnalysisProvider } from './context/AnalysisContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
@@ -19,28 +20,30 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <UploadProvider>
-          <BrowserRouter>
-            <Toaster position="bottom-right" richColors />
-            <Routes>
-              {/* Public routes */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
+          <AnalysisProvider>
+            <BrowserRouter>
+              <Toaster position="bottom-right" richColors />
+              <Routes>
+                {/* Public routes */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
 
-              {/* Protected routes */}
-              <Route element={
-                <ProtectedRoute>
-                  <Layout />
-                </ProtectedRoute>
-              }>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/jobs" element={<Jobs />} />
-                <Route path="/jobs/:id" element={<JobDetail />} />
-                <Route path="/cover-letters" element={<CoverLetters />} />
-                <Route path="/profiles" element={<Profiles />} />
-                <Route path="/discrepancy" element={<Discrepancy />} />
-              </Route>
-            </Routes>
-          </BrowserRouter>
+                {/* Protected routes */}
+                <Route element={
+                  <ProtectedRoute>
+                    <Layout />
+                  </ProtectedRoute>
+                }>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/jobs" element={<Jobs />} />
+                  <Route path="/jobs/:id" element={<JobDetail />} />
+                  <Route path="/cover-letters" element={<CoverLetters />} />
+                  <Route path="/profiles" element={<Profiles />} />
+                  <Route path="/discrepancy" element={<Discrepancy />} />
+                </Route>
+              </Routes>
+            </BrowserRouter>
+          </AnalysisProvider>
         </UploadProvider>
       </AuthProvider>
     </ThemeProvider>

@@ -14,8 +14,8 @@ from ..schemas import (
     CoverLetterRequest, CoverLetterResponse, ResumeOptimizationRequest
 )
 from ..deps import get_current_user
-from matcher import analyze_gaps, analyze_match, generate_cover_letter, combine_profiles, optimize_resume
-from job import extract_full_job_context
+from engine.matcher import analyze_gaps, analyze_match, generate_cover_letter, combine_profiles, optimize_resume
+from engine.job import extract_full_job_context
 
 router = APIRouter()
 
@@ -58,6 +58,7 @@ async def optimize_resume_endpoint(
     # Import ResumeOptimization inside function or at top if available (Assuming imported from ..db)
     from ..db import ResumeOptimization
     
+    print(f"🔍 DEBUG: Checking cache for Job {job.id} and Resume {resume_profile.id}")
     result = await db.execute(
         select(ResumeOptimization).where(
             ResumeOptimization.job_id == job.id,
@@ -67,7 +68,10 @@ async def optimize_resume_endpoint(
     existing_opt = result.scalars().first()
     
     if existing_opt:
+        print("✅ DEBUG: Found cached resume optimization!")
         return existing_opt.optimization_data
+    
+    print("❌ DEBUG: Cache miss - running optimization...")
         
     # 4. Optimize (if not found) - run in thread pool to avoid blocking
     try:
@@ -137,6 +141,8 @@ async def analyze_gaps_endpoint(
     
     Uses analyze_gaps function with job posting data.
     """
+    print(f"📥 DEBUG: Received Gap Analysis Request for Job {request.job_id}")
+    
     # Get combined profile
     profile_data = await get_combined_profile(request.profile_ids, user.id, db)
     
@@ -167,6 +173,7 @@ async def analyze_gaps_endpoint(
         raise HTTPException(status_code=500, detail=f"Gap analysis failed: {str(e)}")
     
     # Save to database
+    print(f"💾 DEBUG: Saving Gap Analysis for Job {request.job_id}")
     gap_analysis = GapAnalysis(
         user_id=user.id,
         job_id=job.id,
@@ -177,6 +184,7 @@ async def analyze_gaps_endpoint(
     db.add(gap_analysis)
     await db.commit()
     await db.refresh(gap_analysis)
+    print(f"✅ DEBUG: Saved Gap Analysis ID: {gap_analysis.id}")
     
     return gap_analysis
 
@@ -250,6 +258,7 @@ async def get_gap_analysis_by_job(
     db: AsyncSession = Depends(get_db)
 ):
     """Get the most recent gap analysis for a specific job."""
+    print(f"🔍 DEBUG: Fetching Gap Analysis for Job {job_id}")
     result = await db.execute(
         select(GapAnalysis)
         .where(GapAnalysis.job_id == job_id, GapAnalysis.user_id == user.id)
@@ -258,8 +267,10 @@ async def get_gap_analysis_by_job(
     analysis = result.scalars().first()
     
     if not analysis:
+        print(f"❌ DEBUG: No analysis found for Job {job_id}")
         raise HTTPException(status_code=404, detail="No gap analysis found for this job")
     
+    print(f"✅ DEBUG: Found Analysis {analysis.id} for Job {job_id}")
     return analysis
 
 

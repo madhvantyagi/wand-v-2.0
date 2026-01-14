@@ -6,7 +6,7 @@ Supports combining multiple profile sources.
 
 from typing import Dict, List, Optional, Literal
 from pydantic import BaseModel, Field
-from models import get_deepseek_client
+from engine.models import get_deepseek_client
 from .gap_analyzer import combine_profiles
 
 

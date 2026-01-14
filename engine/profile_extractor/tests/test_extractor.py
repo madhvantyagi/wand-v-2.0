@@ -4,7 +4,7 @@ Test script for the profile extractor module.
 
 import json
 import os
-from extractor import parse_profile
+from engine.profile_extractor.extractor import parse_profile
 
 
 def print_section(data, section_name, indent=0):
@@ -45,7 +45,9 @@ def main():
     
     try:
         resume_path = os.path.join(test_dir, "resume.pdf")
-        result = parse_profile(resume_path, "pdf")
+        with open(resume_path, 'rb') as f:
+            file_bytes = f.read()
+        result = parse_profile(file_bytes, "pdf")
         data = json.loads(result)
         
         # Save to JSON file
@@ -76,7 +78,9 @@ def main():
     
     try:
         linkedin_path = os.path.join(test_dir, "linkedin.pdf")
-        result = parse_profile(linkedin_path, "pdf")
+        with open(linkedin_path, 'rb') as f:
+            file_bytes = f.read()
+        result = parse_profile(file_bytes, "pdf")
         data = json.loads(result)
         
         # Save to JSON file
@@ -107,7 +111,9 @@ def main():
     
     try:
         html_path = os.path.join(test_dir, "index.html")
-        result = parse_profile(html_path, "html")
+        with open(html_path, 'rb') as f:
+            file_bytes = f.read()
+        result = parse_profile(file_bytes, "html")
         data = json.loads(result)
         
         # Save to JSON file

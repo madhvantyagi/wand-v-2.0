@@ -5,7 +5,7 @@ Uses actual parsed profile and job JSON files
 
 import json
 import os
-from matcher import analyze_gaps, analyze_resume_gaps, analyze_online_presence_gaps
+from engine.matcher import analyze_gaps, analyze_resume_gaps, analyze_online_presence_gaps
 
 
 def load_test_data():

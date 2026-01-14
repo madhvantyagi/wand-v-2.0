@@ -8,7 +8,7 @@ import requests
 from bs4 import BeautifulSoup
 from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
-from models import get_deepseek_client
+from engine.models import get_deepseek_client
 
 
 # ============================================================================

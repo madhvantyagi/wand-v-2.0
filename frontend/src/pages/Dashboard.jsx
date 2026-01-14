@@ -1,13 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import {
-    Sparkles, Loader2, CheckCircle, XCircle, Lightbulb,
-    Building2, Newspaper, FileText, Briefcase, GraduationCap,
-    Award, FolderOpen, ArrowRight, AlertTriangle, DollarSign
-} from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Briefcase, Search, Calendar, ChevronRight, Plus, Trash2, AlertTriangle, Loader2, CheckCircle, Code, StickyNote, XCircle, ArrowRight, Clock, Sparkles, Clipboard, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
-import { jobApi, matchApi, profileApi } from '../api/client'
+import { profileApi, analyzeApi } from '../api/client'
+import { useAnalysis } from '../context/AnalysisContext'
 
 export default function Dashboard() {
     const navigate = useNavigate()
@@ -17,10 +14,40 @@ export default function Dashboard() {
     const [analysis, setAnalysis] = useState(null)
     const [profiles, setProfiles] = useState([])
     const [loadingProfiles, setLoadingProfiles] = useState(true)
+    const textareaRef = useRef(null)
 
+    // Global Analysis Context
+    const {
+        analysisTasks,
+        activeTasks,
+        recentTasks,
+        isQueueOpen,
+        setIsQueueOpen,
+        isConnected,
+        loadTasks,
+        addAnalysisTask,
+        handleDeleteTask,
+        handleClearTasks
+    } = useAnalysis()
+
+    // Load profiles on mount (tasks handled by context)
     useEffect(() => {
         loadProfiles()
+        setTimeout(() => textareaRef.current?.focus(), 100)
     }, [])
+
+
+    // Clear tasks handled by context
+    const [showConfirm, setShowConfirm] = useState(false)
+
+    const confirmClearTasks = async () => {
+        try {
+            await handleClearTasks()
+            setShowConfirm(false)
+        } catch (error) {
+            setShowConfirm(false)
+        }
+    }
 
     const loadProfiles = async () => {
         try {
@@ -30,6 +57,20 @@ export default function Dashboard() {
             console.error('Failed to load profiles:', error)
         } finally {
             setLoadingProfiles(false)
+        }
+    }
+
+    const handlePasteFromClipboard = async () => {
+        try {
+            const text = await navigator.clipboard.readText()
+            if (text) {
+                setJobText(text)
+                toast.success('Pasted from clipboard')
+            } else {
+                toast.error('Clipboard is empty')
+            }
+        } catch (error) {
+            toast.error('Unable to access clipboard. Please paste manually.')
         }
     }
 
@@ -44,48 +85,43 @@ export default function Dashboard() {
             return
         }
 
+        // Ensure WebSocket is connected
+        if (!isConnected) {
+            console.warn('WebSocket not connected, analysis will proceed but updates may not show')
+        }
+
         setIsAnalyzing(true)
         setAnalysis(null)
 
         try {
-            toast.loading('Parsing job posting...', { id: 'analyze' })
-            const job = await jobApi.parsePosting(jobText, null, companyInfo || null)
-
-            let companyIntel = null
-            const companyName = companyInfo || job.company_name
-            if (companyName) {
-                toast.loading('Gathering company intelligence...', { id: 'analyze' })
-                try {
-                    companyIntel = await jobApi.getCompanyIntel(companyName)
-                } catch (error) {
-                    console.warn('Failed to get company intel:', error)
-                }
-            }
-
-            toast.loading('Analyzing match...', { id: 'analyze' })
             const profileIds = profiles.map(p => p.id)
-            const gapAnalysis = await matchApi.analyzeGaps(profileIds, job.id)
+            const companyName = companyInfo || null
 
-            const result = {
-                id: job.id,
-                jobTitle: gapAnalysis.analysis_data?.job_title || job.job_title,
-                company: gapAnalysis.analysis_data?.company_name || job.company_name,
-                matchScore: gapAnalysis.match_score || gapAnalysis.analysis_data?.match_score,
-                parsedJob: job.parsed_data,
-                gapAnalysis: gapAnalysis.analysis_data,
-                companyIntel: companyIntel?.intelligence || null,
+            const result = await analyzeApi.analyze(jobText, profileIds, companyName)
+
+            // Add to global context queue
+            const newTask = {
+                task_id: result.task_id,
+                status: 'pending',
+                progress_message: 'Queued for analysis...',
+                progress: 0,
+                company_name: companyName,
+                created_at: new Date().toISOString()
             }
+            addAnalysisTask(newTask)
 
-            setAnalysis(result)
-            toast.success('Analysis complete!', { id: 'analyze' })
+            // Show initial toast
+            toast.loading('Queued for analysis...', { id: `task - ${result.task_id} ` })
 
-            // Redirect to job detail page
-            navigate(`/jobs/${job.id}`)
+            // Clear input for next job
+            setJobText('')
+            setCompanyInfo('')
+            setIsAnalyzing(false)
 
+            // Analysis will continue in background via context
         } catch (error) {
             console.error('Analysis failed:', error)
-            toast.error(error.message || 'Analysis failed', { id: 'analyze' })
-        } finally {
+            toast.error(error.message || 'Failed to start analysis')
             setIsAnalyzing(false)
         }
     }
@@ -98,6 +134,31 @@ export default function Dashboard() {
     }
 
     const gap = analysis?.gapAnalysis
+
+    // Tasks are filtered in context logic, but we can verify here if needed
+    // Using filtered lists from context directly
+
+    const getStatusIcon = (status) => {
+        switch (status) {
+            case 'complete': return <CheckCircle className="w-4 h-4 text-green-500" />
+            case 'failed': return <XCircle className="w-4 h-4 text-red-500" />
+            case 'pending': return <Clock className="w-4 h-4 text-gray-400" />
+            default: return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+        }
+    }
+
+    const getStatusLabel = (status) => {
+        const labels = {
+            pending: 'Queued',
+            parsing: 'Parsing',
+            intel: 'Intel',
+            analyzing: 'Analyzing',
+            optimizing: 'Optimizing',
+            complete: 'Complete',
+            failed: 'Failed'
+        }
+        return labels[status] || status
+    }
 
     return (
         <div className="max-w-5xl mx-auto space-y-8">
@@ -120,6 +181,164 @@ export default function Dashboard() {
                 </motion.p>
             </div>
 
+            {/* Analysis Queue */}
+            {analysisTasks.length > 0 && (
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="glass-card p-4 transition-all duration-300"
+                >
+                    <div
+                        className="flex items-center justify-between cursor-pointer"
+                        onClick={() => setIsQueueOpen(!isQueueOpen)}
+                    >
+                        <h3 className="font-semibold flex items-center gap-2">
+                            <Clock className="w-4 h-4" />
+                            Analysis Queue
+                            {/* Status Dot */}
+                            <div
+                                className={`w-2 h-2 rounded-full transition-colors duration-300 ${isConnected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500'}`}
+                                title={isConnected ? 'Connected' : 'Disconnected'}
+                            />
+
+                            {activeTasks.length > 0 && (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
+                                    {activeTasks.length} active
+                                </span>
+                            )}
+                        </h3>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    setShowConfirm(true) // Open confirmation
+                                }}
+                                className="text-xs text-[var(--text-tertiary)] hover:text-red-400 px-2 py-1 rounded hover:bg-red-500/10 transition-colors"
+                            >
+                                Clear All
+                            </button>
+                        </div>
+                        {isQueueOpen ? (
+                            <ChevronUp className="w-4 h-4 text-[var(--text-tertiary)]" />
+                        ) : (
+                            <ChevronDown className="w-4 h-4 text-[var(--text-tertiary)]" />
+                        )}
+                    </div>
+
+                    <AnimatePresence>
+                        {isQueueOpen && (
+                            <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                overflow="hidden"
+                                className="space-y-2 mt-4"
+                            >
+                                <AnimatePresence>
+                                    {activeTasks.map(task => (
+                                        <motion.div
+                                            key={task.task_id}
+                                            initial={{ opacity: 0, x: -20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            exit={{ opacity: 0, x: 20 }}
+                                            className="flex items-center gap-3 p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-primary)] group"
+                                        >
+                                            {/* Status Icon */}
+                                            <div className="mt-1">
+                                                {task.status === 'processing' || task.status === 'parsing' || task.status === 'analyzing' ? (
+                                                    <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+                                                ) : task.status === 'complete' ? (
+                                                    <CheckCircle className="w-5 h-5 text-emerald-400" />
+                                                ) : (
+                                                    <XCircle className="w-5 h-5 text-red-400" />
+                                                )}
+                                            </div>
+
+                                            {/* Content */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <p className="text-sm font-medium text-slate-200 truncate">
+                                                        {task.job_title || task.company_name || 'Job Analysis'}
+                                                    </p>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            handleDeleteTask(task.task_id)
+                                                        }}
+                                                        className="p-1 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        title="Remove from queue"
+                                                    >
+                                                        <XCircle className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                                <div className="flex items-center justify-between mt-1">
+                                                    <p className="text-xs text-[var(--text-secondary)] truncate max-w-[200px]">
+                                                        {task.progress_message || task.status}
+                                                    </p>
+                                                    <span className="text-xs font-medium text-slate-500">
+                                                        {task.progress}%
+                                                    </span>
+                                                </div>
+                                                <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden mt-2">
+                                                    <motion.div
+                                                        className="h-full bg-gradient-to-r from-blue-500 to-purple-500"
+                                                        initial={{ width: 0 }}
+                                                        animate={{ width: `${task.progress}% ` }}
+                                                        transition={{ duration: 0.3 }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    ))}
+                                </AnimatePresence>
+
+                                {recentTasks.length > 0 && activeTasks.length > 0 && (
+                                    <div className="border-t border-[var(--border-primary)] my-2" />
+                                )}
+
+                                {recentTasks.map(task => (
+                                    <div
+                                        key={task.task_id}
+                                        className="flex items-center gap-3 p-2 rounded-lg opacity-60 hover:opacity-100 transition-opacity cursor-pointer hover:bg-[var(--bg-secondary)] group"
+                                        onClick={() => task.result_job_id && navigate(`/ jobs / ${task.result_job_id} `)}
+                                    >
+                                        {getStatusIcon(task.status)}
+                                        <span className="text-sm truncate flex-1">
+                                            {task.job_title || task.company_name || 'Job Analysis'}
+                                        </span>
+                                        {task.total_duration && (
+                                            <span className="text-xs text-[var(--text-tertiary)] font-mono mr-2 hidden sm:inline-block">
+                                                {task.total_duration < 60
+                                                    ? `${Math.round(task.total_duration)} s`
+                                                    : `${Math.floor(task.total_duration / 60)}m ${Math.round(task.total_duration % 60)} s`}
+                                            </span>
+                                        )}
+                                        <span className="text-xs text-[var(--text-secondary)] mr-2">
+                                            {getStatusLabel(task.status)}
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            {task.result_job_id && (
+                                                <ArrowRight className="w-4 h-4 text-[var(--text-secondary)]" />
+                                            )}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleDeleteTask(task.task_id)
+                                                }}
+                                                className="p-1 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                title="Remove from history"
+                                            >
+                                                <XCircle className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </motion.div>
+            )}
+
             {/* Profiles Status */}
             {!loadingProfiles && profiles.length === 0 && (
                 <motion.div
@@ -139,11 +358,22 @@ export default function Dashboard() {
                 </motion.div>
             )}
 
+
             {/* Input Section */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="glass-card space-y-6">
                 <div>
-                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Job Description *</label>
+                    <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-[var(--text-secondary)]">Job Description *</label>
+                        <button
+                            onClick={handlePasteFromClipboard}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--glass-hover)] border border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                        >
+                            <Clipboard className="w-3.5 h-3.5" />
+                            Paste from Clipboard
+                        </button>
+                    </div>
                     <textarea
+                        ref={textareaRef}
                         value={jobText}
                         onChange={(e) => setJobText(e.target.value)}
                         placeholder="Paste the complete job posting here..."
@@ -154,9 +384,23 @@ export default function Dashboard() {
                     <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Company Name (Optional)</label>
                     <input type="text" value={companyInfo} onChange={(e) => setCompanyInfo(e.target.value)} placeholder="Company name for additional intelligence..." />
                 </div>
-                <div className="flex justify-end">
-                    <button onClick={handleAnalyze} disabled={!jobText.trim() || isAnalyzing || profiles.length === 0} className="btn-primary">
-                        {isAnalyzing ? (<><Loader2 className="w-4 h-4 animate-spin" />Analyzing...</>) : (<><Sparkles className="w-4 h-4" />Analyze Match</>)}
+                <div className="flex justify-end gap-3">
+                    <button
+                        onClick={handleAnalyze}
+                        disabled={!jobText.trim() || profiles.length === 0 || isAnalyzing}
+                        className="btn-primary"
+                    >
+                        {isAnalyzing ? (
+                            <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Analyzing...
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles className="w-4 h-4" />
+                                Analyze Match
+                            </>
+                        )}
                     </button>
                 </div>
             </motion.div>
@@ -183,10 +427,10 @@ export default function Dashboard() {
                                 <p className="text-[var(--text-secondary)] mb-2">{analysis.company}</p>
                                 {gap.job_description && <p className="text-sm text-[var(--text-tertiary)] mb-3">{gap.job_description}</p>}
                                 <div className="flex gap-3 justify-center md:justify-start">
-                                    <button onClick={() => navigate(`/cover-letters?jobId=${analysis.id}`)} className="btn-primary">
+                                    <button onClick={() => navigate(`/ cover - letters ? jobId = ${analysis.id} `)} className="btn-primary">
                                         <FileText className="w-4 h-4" />Generate Cover Letter
                                     </button>
-                                    <button onClick={() => navigate(`/jobs/${analysis.id}`)} className="btn-secondary">
+                                    <button onClick={() => navigate(`/ jobs / ${analysis.id} `)} className="btn-secondary">
                                         View Details<ArrowRight className="w-4 h-4" />
                                     </button>
                                 </div>
@@ -212,7 +456,7 @@ export default function Dashboard() {
                                 {(gap.compensation.salary_min || gap.compensation.salary_max) && (
                                     <p className="text-xl font-bold text-emerald-400 mb-2">
                                         ${gap.compensation.salary_min?.toLocaleString() || '?'}
-                                        {gap.compensation.salary_max && gap.compensation.salary_max !== gap.compensation.salary_min && ` - $${gap.compensation.salary_max.toLocaleString()}`}
+                                        {gap.compensation.salary_max && gap.compensation.salary_max !== gap.compensation.salary_min && ` - $${gap.compensation.salary_max.toLocaleString()} `}
                                         <span className="text-sm text-[var(--text-tertiary)] font-normal ml-2">
                                             {gap.compensation.currency || 'USD'} / {gap.compensation.pay_type || 'yearly'}
                                         </span>
@@ -375,7 +619,7 @@ export default function Dashboard() {
                                             <tr key={i} className="hover:bg-[var(--glass-hover)] transition-colors">
                                                 <td className="py-3 px-4 text-[var(--text-primary)] font-medium">{item.skill}</td>
                                                 <td className="py-3 px-4">
-                                                    <span className={`px-2 py-1 rounded text-xs border ${item.type === 'hard' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>
+                                                    <span className={`px - 2 py - 1 rounded text - xs border ${item.type === 'hard' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'} `}>
                                                         {item.type === 'hard' ? 'Hard' : 'Soft'}
                                                     </span>
                                                 </td>
@@ -435,6 +679,52 @@ export default function Dashboard() {
                     )}
                 </motion.div>
             )}
+            {/* Confirmation Modal */}
+            <AnimatePresence>
+                {showConfirm && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+                        onClick={() => setShowConfirm(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="glass-card w-full max-w-sm p-6 space-y-4 shadow-2xl"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="flex items-center gap-3 text-red-400">
+                                <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+                                    <AlertTriangle className="w-5 h-5" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-[var(--text-primary)]">Clear History?</h3>
+                            </div>
+
+                            <p className="text-[var(--text-secondary)]">
+                                Are you sure you want to delete all analysis history? This action cannot be undone.
+                            </p>
+
+                            <div className="flex justify-end gap-3 pt-2">
+                                <button
+                                    onClick={() => setShowConfirm(false)}
+                                    className="px-4 py-2 text-sm font-medium rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmClearTasks}
+                                    className="px-4 py-2 text-sm font-medium rounded-lg bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20 transition-all"
+                                >
+                                    Yes, Clear All
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     )
 }
